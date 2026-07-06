@@ -1,0 +1,54 @@
+{
+  "description": "Africa-specific automotive diagnostic prompts for Nomad Runtime / Autex",
+  "context": "These prompts reflect real vehicle types, languages, and constraints common across sub-Saharan Africa. They are included to demonstrate African use-case applicability for the ADTC bonus criteria.",
+  "prompts": [
+    {
+      "id": "af_001",
+      "language": "en",
+      "region": "East Africa",
+      "vehicle_type": "Bajaj Boxer motorcycle",
+      "prompt": "My Bajaj Boxer 150 motorcycle does not start in cold mornings but starts fine after 10am. I hear a single click from the starter motor when I press the button. Battery is 6 months old. What should I check?",
+      "expected_topics": ["battery voltage", "starter motor", "cold weather", "spark plug"]
+    },
+    {
+      "id": "af_002",
+      "language": "sw",
+      "region": "Tanzania / Kenya",
+      "vehicle_type": "Toyota Hiace minibus (matatu)",
+      "prompt": "Basi langu la Toyota Hiace linatoa moshi mweusi mkubwa wakati ninashuka mlima. Injini inasikika kama inapumzika kila sekunde chache. Hii inaweza kuwa tatizo gani? (My Toyota Hiace bus produces heavy black smoke when going downhill. The engine sounds like it is hesitating every few seconds. What could this problem be?)",
+      "expected_topics": ["rich fuel mixture", "injector", "turbo", "intercooler"]
+    },
+    {
+      "id": "af_003",
+      "language": "ha",
+      "region": "Northern Nigeria / Niger",
+      "vehicle_type": "Keke NAPEP (tricycle)",
+      "prompt": "Keken NAPEP na bai tashi lokacin da ake zafi sosai. Yana tashi da safe amma bayan awa biyu yana tsayawa. Menene matsalar kuma yaya zan gyara shi? (My NAPEP tricycle does not run when it is very hot. It starts in the morning but after two hours it stops. What is the problem and how do I fix it?)",
+      "expected_topics": ["vapor lock", "fuel system", "heat soak", "cooling"]
+    },
+    {
+      "id": "af_004",
+      "language": "en",
+      "region": "West Africa",
+      "vehicle_type": "Chinese minibus (Sinotruk / Yutong)",
+      "prompt": "My Yutong minibus shows error code 1110 on the dashboard display. The air conditioning stopped working and the engine temperature gauge is higher than normal. We use the bus for school children in rural Ghana with no nearby dealer. What can I check myself?",
+      "expected_topics": ["coolant", "AC compressor", "belt", "OBD code", "self-repair"]
+    },
+    {
+      "id": "af_005",
+      "language": "en",
+      "region": "Southern Africa",
+      "vehicle_type": "Toyota Land Cruiser 70 series",
+      "prompt": "My Land Cruiser 70 series diesel has been running on adulterated fuel from a roadside vendor in rural Zambia. Now it has low power and white smoke from the exhaust. The fuel filter was changed 3 months ago. What damage may have occurred and what should I prioritize fixing?",
+      "expected_topics": ["injector damage", "fuel contamination", "injector pump", "diagnostics"]
+    },
+    {
+      "id": "af_006",
+      "language": "en",
+      "region": "East Africa",
+      "vehicle_type": "Tuk-tuk / Auto rickshaw",
+      "prompt": "My 3-wheel tuk-tuk runs fine during daylight but stalls every time I turn on the headlights at night. The battery is one year old. This happens every evening on my route between villages in rural Uganda where there is no mechanic nearby. What is wrong?",
+      "expected_topics": ["alternator", "charging system", "battery", "electrical load"]
+    }
+  ]
+}

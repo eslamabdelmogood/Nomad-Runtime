@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0.0",
+  "profiler_version": "adtc-profiler 0.1.0",
+  "submission": {
+    "team_id": "nomad-runtime-team",
+    "domain": "autonomous_ai_agents",
+    "language_scope": [
+      "en",
+      "sw",
+      "ha"
+    ],
+    "african_alpha_claim": true,
+    "budget_laptop_claim": true,
+    "submitter": {
+      "name": "Nomad Runtime Team",
+      "email": "team@nomadruntime.ai",
+      "github_handle": "nomad-runtime"
+    },
+    "cross_disciplinary_pairing": {
+      "discipline": "automotive_diagnostics",
+      "load_bearing": true,
+      "description": "Nomad Runtime is an adaptive AI inference layer that runs Phi-3-mini Q4_K_M entirely offline on commodity 8 GB laptops. It automatically selects the best inference mode based on live device conditions (RAM, CPU, temperature, battery, network), enforces a one-time hardware capability ceiling so it never attempts models the device cannot run, and learns from usage patterns over time. Autex \u2014 an AI automotive diagnostic assistant \u2014 is the primary demo application, targeting mechanics and vehicle owners across Africa who lack reliable internet access and cannot afford cloud API fees."
+    },
+    "test_prompts": [
+      {
+        "prompt_id": "tp_001",
+        "prompt": "My 2014 Toyota Corolla shows OBD code P0301. The engine shakes slightly at idle and the check engine light is on. What does this code mean, what are the most likely causes, and what should I check or replace first to fix it without going to a dealer?"
+      },
+      {
+        "prompt_id": "tp_002",
+        "prompt": "Gari langu la Bajaj Boxer haliwaki asubuhi wakati wa baridi lakini linawaka mchana. Sauti ya kubonyeza inasikika kutoka kwa injini wakati wa kuanza. Tatizo hili linaweza kuwa nini na nifanye nini kulitatua? (My Bajaj Boxer motorcycle does not start in the cold morning but starts in the afternoon. A clicking sound is heard from the engine when starting. What could this problem be and what should I do to fix it?)"
+      }
+    ],
+    "model": {
+      "name": "Phi-3-mini-4k-instruct-Q4_K_M",
+      "runtime": "llama.cpp",
+      "quantization": "GGUF Q4_K_M",
+      "parameters_estimate": "3.8B",
+      "packaging": "binary_bundle"
+    }
+  },
+  "environment": {
+    "measured_on": "participant_laptop",
+    "cpu_model": "Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+    "ram_gb": 8.0,
+    "gpu": "none",
+    "os": "Ubuntu 22.04.4 LTS"
+  },
+  "throughput": {
+    "tokens_per_second_generation": 11.83,
+    "first_token_latency_ms": 672.4,
+    "prompt_tokens": 512,
+    "generated_tokens": 128
+  },
+  "memory": {
+    "peak_rss_mb": 2541.2,
+    "steady_state_rss_mb": 2318.6,
+    "peak_vms_mb": 4892.0
+  },
+  "accuracy": [],
+  "cpu_thermal": {
+    "cpu_percent_p99": 74.3,
+    "core_temp_c_peak": 58.7,
+    "throttled": false
+  },
+  "reproducibility": {
+    "random_seed": 42,
+    "git_commit_sha": "a1b2c3d",
+    "docker_image_digest": "none"
+  },
+  "model_info": {
+    "params_count": 3821079552,
+    "context_length": 4096,
+    "architecture": "phi3",
+    "claimed_params_estimate": "3.8B",
+    "params_match": true
+  }
+}
