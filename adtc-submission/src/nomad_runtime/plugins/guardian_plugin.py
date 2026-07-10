@@ -29,6 +29,8 @@ class GuardianPlugin(InferencePlugin):
             "oil":        "NOTICE: Oil-related anomaly detected. Check oil level and pressure when safe.",
             "brake":      "WARNING: Brake system alert. Test brakes cautiously and seek immediate service.",
             "battery":    "NOTICE: Battery voltage low. Check alternator and battery connections.",
+            "knock":      "WARNING: Knocking sound may indicate low oil or worn bearings. Check oil level immediately and reduce engine load.",
+            "knock":      "WARNING: Knocking sound may indicate low oil or worn bearings. Check oil level immediately and reduce engine load.",
         },
         "default": (
             "Device resources are critically low. "
