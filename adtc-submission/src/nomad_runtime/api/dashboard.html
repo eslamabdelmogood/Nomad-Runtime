@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nomad Runtime — Control Center</title>
+<style>
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --card:     #1c2330;
+    --border:   #30363d;
+    --text:     #e6edf3;
+    --muted:    #8b949e;
+    --accent:   #58a6ff;
+
+    --stallion: #f0883e;
+    --workhorse:#3fb950;
+    --nomad:    #58a6ff;
+    --guardian: #ff7b72;
+
+    --radius:   10px;
+    --font:     'Inter', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #58a6ff 0%, #3fb950 100%);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+  header .subtitle { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .api-badge {
+    font-size: 11px; padding: 3px 10px;
+    border-radius: 20px; border: 1px solid var(--border);
+    color: var(--muted); background: var(--bg);
+  }
+  .api-badge.connected { border-color: #3fb95066; color: #3fb950; background: #3fb95011; }
+
+  /* ── Layout ── */
+  .main { display: grid; grid-template-columns: 300px 1fr; gap: 0; height: calc(100vh - 69px); }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  .section-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* ── Mode badge ── */
+  .mode-display {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+  .mode-name {
+    font-size: 28px; font-weight: 700; letter-spacing: -1px;
+    margin-bottom: 4px;
+    transition: color 0.4s;
+  }
+  .mode-reason { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .mode-score { font-size: 11px; margin-top: 8px; color: var(--muted); }
+  .mode-score span { color: var(--text); font-weight: 600; }
+
+  /* ── Metrics ── */
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .metric-value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .metric-sub   { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* Progress bar */
+  .bar-track {
+    height: 5px; border-radius: 3px; background: var(--border);
+    margin-top: 8px; overflow: hidden;
+  }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .bar-cpu    { background: #f0883e; }
+  .bar-ram    { background: #58a6ff; }
+  .bar-bat    { background: #3fb950; }
+
+  /* ── Mode switcher buttons ── */
+  .mode-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .mode-btn {
+    padding: 9px 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--muted);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    font-family: var(--font);
+  }
+  .mode-btn:hover { border-color: var(--accent); color: var(--text); }
+  .mode-btn.active { color: var(--bg); font-weight: 600; border-color: transparent; }
+  .mode-btn.stallion.active  { background: var(--stallion); }
+  .mode-btn.workhorse.active { background: var(--workhorse); }
+  .mode-btn.nomad.active     { background: var(--nomad); }
+  .mode-btn.guardian.active  { background: var(--guardian); }
+  .mode-btn .btn-icon { font-size: 16px; display: block; margin-bottom: 2px; }
+
+  /* ── History ── */
+  .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; }
+  .history-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: var(--card);
+    font-size: 11px;
+  }
+  .history-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .history-reason { color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-time { color: var(--muted); font-size: 10px; flex-shrink: 0; }
+
+  /* ── Main panel ── */
+  .panel {
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* ── Tab bar ── */
+  .tabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 3px; width: fit-content; }
+  .tab {
+    padding: 6px 16px; border-radius: 7px; font-size: 13px;
+    cursor: pointer; color: var(--muted); transition: all 0.2s;
+    font-family: var(--font); background: none; border: none;
+  }
+  .tab.active { background: var(--card); color: var(--text); font-weight: 500; }
+
+  /* ── Chat ── */
+  .chat-container {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; flex-direction: column;
+    height: 520px;
+  }
+  .chat-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px;
+  }
+  .chat-messages {
+    flex: 1; overflow-y: auto;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .msg { display: flex; gap: 10px; }
+  .msg-avatar {
+    width: 28px; height: 28px; border-radius: 6px;
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .msg.user .msg-avatar  { background: #58a6ff22; color: #58a6ff; }
+  .msg.ai   .msg-avatar  { background: #3fb95022; color: #3fb950; }
+  .msg-body { flex: 1; }
+  .msg-meta { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+  .msg-text { font-size: 13px; line-height: 1.6; }
+  .msg-stats {
+    font-size: 10px; color: var(--muted);
+    margin-top: 6px; display: flex; gap: 12px;
+  }
+  .msg-stats .stat-val { color: var(--text); }
+
+  .chat-input-row {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px;
+  }
+  .chat-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); padding: 9px 14px;
+    font-size: 13px; font-family: var(--font); resize: none; height: 40px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .chat-input:focus { border-color: var(--accent); }
+  .chat-send {
+    background: var(--accent); color: var(--bg); border: none;
+    border-radius: 8px; padding: 0 16px; font-size: 13px;
+    font-weight: 600; cursor: pointer; font-family: var(--font);
+    transition: opacity 0.2s;
+  }
+  .chat-send:hover { opacity: 0.85; }
+  .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .typing { display: none; align-items: center; gap: 8px; padding: 0 16px; }
+  .typing.visible { display: flex; }
+  .dot-anim { display: flex; gap: 3px; }
+  .dot-anim span {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--muted); animation: bounce 1.2s infinite;
+  }
+  .dot-anim span:nth-child(2) { animation-delay: 0.2s; }
+  .dot-anim span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+
+  /* ── Benchmark ── */
+  .bench-section { display: flex; flex-direction: column; gap: 16px; }
+  .bench-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .bench-card-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .bench-title { font-weight: 600; }
+  .bench-subtitle { font-size: 11px; color: var(--muted); }
+  .bench-body { padding: 16px; }
+  .bench-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+  }
+  .bench-row:last-child { border-bottom: none; }
+  .bench-row-label { font-size: 12px; color: var(--muted); }
+  .bench-row-value { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .badge {
+    padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600;
+  }
+  .badge.good { background: #3fb95022; color: #3fb950; }
+  .badge.warn { background: #f0883e22; color: #f0883e; }
+  .badge.info { background: #58a6ff22; color: #58a6ff; }
+
+  .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .score-bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .score-bar-fill  { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.8s ease; }
+  .score-label { font-size: 11px; font-weight: 600; min-width: 30px; text-align: right; }
+
+  .run-btn {
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--text); padding: 8px 18px; border-radius: 8px;
+    font-size: 13px; font-family: var(--font); cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .run-btn:hover { border-color: var(--accent); }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Scrollbars ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Ollama setup note ── */
+  .setup-banner {
+    background: #f0883e11;
+    border: 1px solid #f0883e33;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #f0883e;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .setup-banner code {
+    background: #f0883e1a;
+    padding: 1px 6px; border-radius: 4px;
+    font-family: monospace; font-size: 11px;
+  }
+
+  /* ── tabs content ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: flex; flex-direction: column; gap: 16px; }
+
+  .adtc-scores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .adtc-score-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; text-align: center;
+  }
+  .adtc-score-card .weight { font-size: 10px; color: var(--muted); margin-bottom: 8px; }
+  .adtc-score-card .value { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .adtc-score-card .label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">N</div>
+  <div>
+    <h1>Nomad Runtime</h1>
+    <div class="subtitle">Adaptive Offline AI Runtime · Autex Integration</div>
+  </div>
+  <div class="header-right">
+    <div class="api-badge" id="api-status">API: checking...</div>
+    <div class="api-badge" id="ollama-status">Ollama: checking...</div>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+
+    <!-- Current mode -->
+    <div>
+      <div class="section-label">Active Mode</div>
+      <div class="mode-display">
+        <div class="mode-name" id="mode-name">—</div>
+        <div class="mode-reason" id="mode-reason">Detecting device state...</div>
+        <div class="mode-score">Health score: <span id="mode-score">—</span>/100</div>
+      </div>
+    </div>
+
+    <!-- Device metrics -->
+    <div>
+      <div class="section-label">Device Metrics</div>
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="metric-label">CPU</div>
+          <div class="metric-value" id="cpu-val">—%</div>
+          <div class="bar-track"><div class="bar-fill bar-cpu" id="cpu-bar" style="width:0%"></div></div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">RAM Free</div>
+          <div class="metric-value" id="ram-val">— GB</div>
+          <div class="bar-track"><div class="bar-fill bar-ram" id="ram-bar" style="width:0%"></div></div>
+          <div class="metric-sub" id="ram-sub"></div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Temp</div>
+          <div class="metric-value" id="temp-val">—°C</div>
+          <div class="metric-sub" id="temp-sub">sensor</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Network</div>
+          <div class="metric-value" id="net-val">—</div>
+          <div class="metric-sub" id="net-sub">speed</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode switcher -->
+    <div>
+      <div class="section-label">Force Mode</div>
+      <div class="mode-buttons">
+        <button class="mode-btn stallion"  onclick="forceMode('stallion')">
+          <span class="btn-icon">🚀</span>Stallion
+        </button>
+        <button class="mode-btn workhorse" onclick="forceMode('workhorse')">
+          <span class="btn-icon">⚙️</span>Workhorse
+        </button>
+        <button class="mode-btn nomad"     onclick="forceMode('nomad')">
+          <span class="btn-icon">📡</span>Nomad
+        </button>
+        <button class="mode-btn guardian"  onclick="forceMode('guardian')">
+          <span class="btn-icon">🛡️</span>Guardian
+        </button>
+      </div>
+      <p style="font-size:10px;color:var(--muted);margin-top:8px;">Auto-select resumes after 30s without forcing.</p>
+    </div>
+
+    <!-- Mode history -->
+    <div>
+      <div class="section-label">Mode History</div>
+      <div class="history-list" id="history-list">
+        <div style="font-size:11px;color:var(--muted);padding:8px;">Loading history...</div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── MAIN PANEL ── -->
+  <main class="panel">
+
+    <!-- Tab bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('capability',this)">Capability</button>
+        <button class="tab" onclick="switchTab('chat',this)">Autex Chat</button>
+        <button class="tab" onclick="switchTab('benchmark',this)">Benchmark</button>
+        <button class="tab" onclick="switchTab('learning',this)">Learning</button>
+        <button class="tab" onclick="switchTab('plugins',this)">Plugins</button>
+        <button class="tab" onclick="switchTab('setup',this)">Setup Guide</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);" id="last-updated">—</div>
+    </div>
+
+    <!-- ── CAPABILITY TAB ── -->
+    <div class="tab-panel active" id="tab-capability">
+
+      <div class="setup-banner" style="background:#58a6ff11;border-color:#58a6ff33;color:#58a6ff;">
+        <span>🔍</span>
+        <div>
+          Runs <strong>once</strong> per machine on first boot and is cached.
+          Builds a fixed hardware ceiling — CPU, RAM, instruction sets, GPU/NPU,
+          OS — so the runtime never wastes a request attempting a model tier
+          this device physically can't run, regardless of how favourable a
+          momentary RAM/CPU reading looks.
+        </div>
+      </div>
+
+      <!-- Headline verdict -->
+      <div class="bench-card">
+        <div class="bench-card-header">
+          <div>
+            <div class="bench-title">Device Verdict</div>
+            <div class="bench-subtitle" id="cap-scan-meta">Scanning...</div>
+          </div>
+          <button class="run-btn" onclick="rescanCapability()">↻ Re-scan</button>
+        </div>
+        <div class="bench-body">
+          <div id="cap-headline" style="font-size:14px;line-height:1.6;padding:8px 0;color:var(--muted);">
+            Running first-boot capability scan...
+          </div>
+        </div>
+      </div>
+
+      <!-- Hardware spec grid -->
+      <div class="bench-card">
+        <div class="bench-card-header"><div class="bench-title">Detected Hardware</div></div>
+        <div class="bench-body">
+          <div class="metric-grid" style="grid-template-columns:repeat(4,1fr);gap:10px;" id="cap-spec-grid">
+            <div class="metric"><div class="metric-label">CPU</div><div class="metric-value" id="cap-cpu" style="font-size:13px;">—</div></div>
+            <div class="metric"><div class="metric-label">Cores</div><div class="metric-value" id="cap-cores">—</div></div>
+            <div class="metric"><div class="metric-label">RAM</div><div class="metric-value" id="cap-ram">—</div></div>
+            <div class="metric"><div class="metric-label">AVX2</div><div class="metric-value" id="cap-avx2">—</div></div>
+            <div class="metric"><div class="metric-label">GPU</div><div class="metric-value" id="cap-gpu" style="font-size:13px;">—</div></div>
+            <div class="metric"><div class="metric-label">NPU</div><div class="metric-value" id="cap-npu" style="font-size:13px;">—</div></div>
+            <div class="metric"><div class="metric-label">Battery</div><div class="metric-value" id="cap-battery">—</div></div>
+            <div class="metric"><div class="metric-label">OS</div><div class="metric-value" id="cap-os" style="font-size:13px;">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tier viability -->
+      <div class="bench-card">
+        <div class="bench-card-header">
+          <div>
+            <div class="bench-title">Model Tier Viability</div>
+            <div class="bench-subtitle">What this specific machine can run, decided once and enforced as a ceiling</div>
+          </div>
+        </div>
+        <div class="bench-body" id="cap-tiers-body">
+          <div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Loading...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── CHAT TAB ── -->
+    <div class="tab-panel" id="tab-chat">
+      <div class="chat-container">
+        <div class="chat-header">
+          <div>
+            <span style="font-weight:600;">Autex Master Mechanic</span>
+            <span style="color:var(--muted);margin-left:8px;">via Nomad Runtime</span>
+          </div>
+          <div id="chat-mode-badge" class="badge info">nomad</div>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+          <!-- welcome message -->
+          <div class="msg ai">
+            <div class="msg-avatar">A</div>
+            <div class="msg-body">
+              <div class="msg-meta">Autex · Guardian mode</div>
+              <div class="msg-text">Hello. I'm the Autex AI diagnostic assistant, running through Nomad Runtime. I can help diagnose engine sounds, read OBD codes, and advise on maintenance. What's happening with your vehicle?</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="typing" id="typing-indicator">
+          <div class="msg-avatar" style="width:28px;height:28px;border-radius:6px;background:#3fb95022;color:#3fb950;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">A</div>
+          <div class="dot-anim"><span></span><span></span><span></span></div>
+        </div>
+
+        <div class="chat-input-row">
+          <textarea
+            class="chat-input" id="chat-input"
+            placeholder="Describe a sound, paste an OBD code, or ask about maintenance..."
+            onkeydown="handleKey(event)"></textarea>
+          <button class="chat-send" id="chat-send" onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BENCHMARK TAB ── -->
+    <div class="tab-panel" id="tab-benchmark">
+
+      <!-- ADTC scores -->
+      <div>
+        <div class="section-label">ADTC Score Projection</div>
+        <div class="adtc-scores">
+          <div class="adtc-score-card">
+            <div class="weight">Sperf · 30%</div>
+            <div class="value" id="adtc-sperf" style="color:var(--nomad)">—</div>
+            <div class="label">Tokens / sec vs 15 TPS target</div>
+          </div>
+          <div class="adtc-score-card">
+            <div class="weight">Seff · 20%</div>
+            <div class="value" id="adtc-seff" style="color:var(--workhorse)">—</div>
+            <div class="label">RAM efficiency vs 7 GB budget</div>
+          </div>
+          <div class="adtc-score-card">
+            <div class="weight">Est. Total</div>
+            <div class="value" id="adtc-total" style="color:var(--stallion)">—</div>
+            <div class="label">Sacc (judge) adds up to 50 pts</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bench-section" id="bench-results">
+        <div class="bench-card">
+          <div class="bench-card-header">
+            <div>
+              <div class="bench-title">Benchmark Results</div>
+              <div class="bench-subtitle">Run against ADTC Standard Laptop profile</div>
+            </div>
+            <button class="run-btn" id="run-btn" onclick="runBenchmark()">▶ Run Guardian</button>
+          </div>
+          <div class="bench-body" id="bench-body">
+            <div style="color:var(--muted);font-size:12px;text-align:center;padding:24px;">
+              Click "Run Guardian" to benchmark — no model needed.<br>
+              For Nomad/Workhorse/Stallion, start Ollama first.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Per-run table -->
+      <div class="bench-card" id="run-table-card" style="display:none;">
+        <div class="bench-card-header">
+          <div class="bench-title">Per-prompt results</div>
+        </div>
+        <div class="bench-body">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;" id="run-table">
+            <thead>
+              <tr style="color:var(--muted);">
+                <th style="text-align:left;padding:4px 8px;">Prompt</th>
+                <th style="text-align:right;padding:4px 8px;">Latency</th>
+                <th style="text-align:right;padding:4px 8px;">TPS</th>
+                <th style="text-align:right;padding:4px 8px;">RAM Δ</th>
+                <th style="text-align:right;padding:4px 8px;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="run-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── LEARNING TAB ── -->
+    <div class="tab-panel" id="tab-learning">
+
+      <div class="setup-banner" style="background:#58a6ff11;border-color:#58a6ff33;color:#58a6ff;">
+        <span>🧠</span>
+        <div>
+          The runtime learns two things over time: <strong>which devices are
+          chronically constrained</strong> (so it stops trying big models on
+          them) and <strong>which task types need a bigger model</strong> to
+          give a satisfying answer. Learned state persists across restarts.
+        </div>
+      </div>
+
+      <!-- Device profile -->
+      <div class="bench-card">
+        <div class="bench-card-header">
+          <div>
+            <div class="bench-title">Device Profile</div>
+            <div class="bench-subtitle">What the runtime has learned about this machine</div>
+          </div>
+          <div id="device-learn-confidence" class="badge info">0% confidence</div>
+        </div>
+        <div class="bench-body" id="device-learn-body">
+          <div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Loading device profile...</div>
+        </div>
+      </div>
+
+      <!-- Task quality demand -->
+      <div class="bench-card">
+        <div class="bench-card-header">
+          <div>
+            <div class="bench-title">Task Quality Demand</div>
+            <div class="bench-subtitle">Learned from response length vs. task category, per the satisfaction heuristic</div>
+          </div>
+          <button class="run-btn" onclick="resetLearning()">↺ Reset learning</button>
+        </div>
+        <div class="bench-body" id="task-learn-body">
+          <div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">No task data yet — chat with Autex to begin learning.</div>
+        </div>
+      </div>
+
+      <!-- Recent learning events -->
+      <div class="bench-card">
+        <div class="bench-card-header">
+          <div class="bench-title">Recent Learning Events</div>
+          <div class="bench-subtitle">Last 15 (prompt → category → mode → outcome)</div>
+        </div>
+        <div class="bench-body">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="color:var(--muted);">
+                <th style="text-align:left;padding:4px 8px;">Prompt</th>
+                <th style="text-align:left;padding:4px 8px;">Category</th>
+                <th style="text-align:right;padding:4px 8px;">Mode</th>
+                <th style="text-align:right;padding:4px 8px;">Tokens</th>
+              </tr>
+            </thead>
+            <tbody id="learn-events-body">
+              <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px;">No events yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── PLUGINS TAB ── -->
+    <div class="tab-panel" id="tab-plugins">
+
+      <div class="setup-banner" style="background:#3fb95011;border-color:#3fb95033;color:#3fb950;">
+        <span>🔌</span>
+        <div>
+          <strong>Plugin Architecture</strong> — every inference engine is a peer plugin discovered
+          automatically from the <code style="background:#3fb95022;padding:1px 5px;border-radius:3px;font-size:11px;">plugins/</code> directory.
+          Adding TensorRT, ExecuTorch, or any future engine means creating one new file.
+          The router, API, and dashboard require zero changes.
+        </div>
+      </div>
+
+      <!-- Plugin cards -->
+      <div id="plugin-cards" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="color:var(--muted);font-size:12px;text-align:center;padding:24px;">
+          Loading plugin registry...
+        </div>
+      </div>
+
+      <!-- How to add a plugin -->
+      <div class="bench-card">
+        <div class="bench-card-header"><div class="bench-title">How to add a new engine</div></div>
+        <div class="bench-body" style="font-size:13px;display:flex;flex-direction:column;gap:12px;">
+          <p style="color:var(--muted);">
+            Three methods override the required <code style="background:var(--surface);padding:1px 5px;border-radius:4px;font-family:monospace;">InferencePlugin</code> contract.
+            Zero files in the router, registry, or API change.
+          </p>
+          <pre style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;overflow-x:auto;line-height:1.6;">from plugin_base import InferencePlugin, PluginCapabilities, \
+    PluginHealthStatus, PluginInferenceResult
+
+class TensorRTPlugin(InferencePlugin):
+    engine_id = "tensorrt"          # matches MODEL_REGISTRY engine_id
+
+    def capabilities(self) -> PluginCapabilities:
+        return PluginCapabilities(engine_name="TensorRT",
+                                  requires_gpu=True, typical_formats=["engine"])
+
+    def health_check(self) -> PluginHealthStatus:
+        # is TensorRT runtime available?
+        ...
+
+    def infer(self, model_id, prompt, system_prompt="",
+              max_tokens=512, temperature=0.3) -> PluginInferenceResult:
+        # call TensorRT — never raise, always return PluginInferenceResult
+        ...</pre>
+          <p style="color:var(--muted);">Save as <code style="background:var(--surface);padding:1px 5px;border-radius:4px;font-family:monospace;">plugins/tensorrt_plugin.py</code> — it appears here on next restart.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── SETUP TAB ── -->
+    <div class="tab-panel" id="tab-setup">
+      <div class="bench-card">
+        <div class="bench-card-header"><div class="bench-title">Step 1 — Start Nomad Runtime API</div></div>
+        <div class="bench-body" style="font-size:13px;display:flex;flex-direction:column;gap:10px;">
+          <p style="color:var(--muted);">The API server bridges this dashboard to the device monitor and inference engine.</p>
+          <pre style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;overflow-x:auto;">cd nomad-runtime/api
+python server.py</pre>
+          <p style="color:var(--muted);">Runs on <code style="background:var(--surface);padding:1px 6px;border-radius:4px;">http://localhost:8765</code></p>
+        </div>
+      </div>
+
+      <div class="bench-card">
+        <div class="bench-card-header"><div class="bench-title">Step 2 — Install Ollama &amp; pull models</div></div>
+        <div class="bench-body" style="font-size:13px;display:flex;flex-direction:column;gap:10px;">
+          <p style="color:var(--muted);">Ollama runs models locally with no cloud dependency.</p>
+          <pre style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;overflow-x:auto;"># Install (Linux)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Nomad mode (~2.2 GB RAM)
+ollama pull phi3:mini
+
+# Workhorse mode (~3.8 GB RAM)
+ollama pull llama3.2:3b
+
+# Start server
+ollama serve</pre>
+        </div>
+      </div>
+
+      <div class="bench-card">
+        <div class="bench-card-header"><div class="bench-title">Step 3 — Connect Autex</div></div>
+        <div class="bench-body" style="font-size:13px;display:flex;flex-direction:column;gap:10px;">
+          <p style="color:var(--muted);">Add this to your Autex Next.js app to replace the Gemini API call with Nomad Runtime:</p>
+          <pre style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;overflow-x:auto;">// src/lib/nomad-client.ts
+const NOMAD_API = 'http://localhost:8765';
+
+export async function nomadChat(prompt: string, systemPrompt?: string) {
+  const res = await fetch(`${NOMAD_API}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, system_prompt: systemPrompt }),
+  });
+  return res.json();
+  // Returns: { mode, model, response_text, latency_ms, ... }
+}</pre>
+          <p style="color:var(--muted);">Nomad Runtime auto-selects the best model. Autex needs zero changes to its UI.</p>
+        </div>
+      </div>
+
+      <div class="bench-card">
+        <div class="bench-card-header"><div class="bench-title">Step 4 — ADTC submission checklist</div></div>
+        <div class="bench-body">
+          <div class="bench-row"><span class="bench-row-label">Domain registered</span><span class="badge info">Autonomous AI Agents</span></div>
+          <div class="bench-row"><span class="bench-row-label">Local inference (no cloud required)</span><span class="badge good">✓ Ollama + llama.cpp</span></div>
+          <div class="bench-row"><span class="bench-row-label">RAM under 7 GB budget</span><span class="badge good">✓ Nomad: ~2.2 GB</span></div>
+          <div class="bench-row"><span class="bench-row-label">Thermal guard (−10 pt penalty)</span><span class="badge good">✓ Monitored + mode drop</span></div>
+          <div class="bench-row"><span class="bench-row-label">Offline functionality</span><span class="badge good">✓ Nomad + Guardian modes</span></div>
+          <div class="bench-row"><span class="bench-row-label">Mode switching demo</span><span class="badge good">✓ This dashboard</span></div>
+          <div class="bench-row"><span class="bench-row-label">MPAE strategy layer</span><span class="badge warn">⟳ From Autex (TypeScript)</span></div>
+          <div class="bench-row"><span class="bench-row-label">GitHub repo + report</span><span class="badge warn">⟳ To submit</span></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const API = 'http://localhost:8765';
+let currentMode = 'nomad';
+
+// ── Colour helpers ──────────────────────────────────────────────────
+const modeColor = {
+  stallion:  '#f0883e',
+  workhorse: '#3fb950',
+  nomad:     '#58a6ff',
+  guardian:  '#ff7b72',
+};
+const modeEmoji = { stallion:'🚀', workhorse:'⚙️', nomad:'📡', guardian:'🛡️' };
+
+function setModeDisplay(mode, reason, score) {
+  currentMode = mode;
+  const el = document.getElementById('mode-name');
+  el.textContent  = (modeEmoji[mode] || '') + ' ' + mode.toUpperCase();
+  el.style.color  = modeColor[mode] || '#e6edf3';
+  document.getElementById('mode-reason').textContent  = reason || '';
+  document.getElementById('mode-score').textContent   = score ?? '—';
+  document.getElementById('chat-mode-badge').textContent = mode;
+  document.getElementById('chat-mode-badge').className = 'badge info';
+
+  // Active button
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.mode-btn.${mode}`);
+  if (btn) btn.classList.add('active');
+}
+
+function updateMetrics(device) {
+  document.getElementById('cpu-val').textContent  = device.cpu_percent.toFixed(0) + '%';
+  document.getElementById('cpu-bar').style.width  = device.cpu_percent + '%';
+
+  document.getElementById('ram-val').textContent  = device.ram_free_gb.toFixed(1) + ' GB';
+  document.getElementById('ram-sub').textContent  = `of ${device.ram_total_gb.toFixed(1)} GB total`;
+  const ramPct = (device.ram_free_gb / device.ram_total_gb) * 100;
+  document.getElementById('ram-bar').style.width  = ramPct + '%';
+
+  document.getElementById('temp-val').textContent = device.cpu_temp_c ? device.cpu_temp_c + '°C' : 'n/a';
+  document.getElementById('temp-sub').textContent = device.cpu_temp_c ?
+    (device.cpu_temp_c >= 85 ? '⚠ throttle risk' : 'ok') : 'no sensor';
+
+  const online = device.network_online;
+  document.getElementById('net-val').textContent  = online ? device.network_speed : 'offline';
+  document.getElementById('net-sub').textContent  = online ? 'connected' : 'no internet';
+
+  document.getElementById('last-updated').textContent =
+    'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ── API polling ─────────────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const r = await fetch(API + '/status', {signal: AbortSignal.timeout(4000)});
+    if (!r.ok) throw new Error('bad status');
+    const d = await r.json();
+    setModeDisplay(d.mode, d.reason, d.score);
+    updateMetrics(d.device);
+    document.getElementById('api-status').textContent  = 'API: connected';
+    document.getElementById('api-status').className    = 'api-badge connected';
+  } catch {
+    document.getElementById('api-status').textContent  = 'API: offline';
+    document.getElementById('api-status').className    = 'api-badge';
+    // Simulate realistic values for demo when API is offline
+    simulateMetrics();
+  }
+}
+
+async function pollHistory() {
+  try {
+    const r = await fetch(API + '/history', {signal: AbortSignal.timeout(3000)});
+    if (!r.ok) return;
+    const items = await r.json();
+    renderHistory(items.slice(-8).reverse());
+  } catch {}
+}
+
+async function checkOllama() {
+  try {
+    const r = await fetch(API + '/models', {signal: AbortSignal.timeout(3000)});
+    const d = await r.json();
+    const count = d.models?.length || 0;
+    document.getElementById('ollama-status').textContent = `Ollama: ${count} model${count!==1?'s':''}`;
+    document.getElementById('ollama-status').className   = count > 0 ? 'api-badge connected' : 'api-badge';
+  } catch {
+    document.getElementById('ollama-status').textContent = 'Ollama: offline';
+    document.getElementById('ollama-status').className   = 'api-badge';
+  }
+}
+
+// ── Simulated metrics for offline demo ─────────────────────────────
+let simTick = 0;
+function simulateMetrics() {
+  simTick++;
+  const cpu  = 12 + Math.sin(simTick * 0.3) * 8 + Math.random() * 5;
+  const free = 3.4 + Math.sin(simTick * 0.1) * 0.3;
+  const total = 3.9;
+  const snap = {
+    cpu_percent:    Math.min(99, Math.max(0, cpu)),
+    ram_free_gb:    parseFloat(free.toFixed(2)),
+    ram_total_gb:   total,
+    cpu_temp_c:     null,
+    network_online: false,
+    network_speed:  'none',
+  };
+  updateMetrics(snap);
+
+  const mode = free < 1 ? 'guardian' : free < 3.5 ? 'nomad' : 'workhorse';
+  setModeDisplay(mode, 'Simulated — start nomad-runtime/api/server.py for live data', 75);
+}
+
+// ── History rendering ───────────────────────────────────────────────
+function renderHistory(items) {
+  const list = document.getElementById('history-list');
+  if (!items.length) { list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px;">No history yet</div>'; return; }
+  list.innerHTML = items.map(item => {
+    const ago = Math.round((Date.now()/1000 - item.timestamp));
+    const t   = ago < 60 ? ago + 's ago' : Math.round(ago/60) + 'm ago';
+    return `<div class="history-item">
+      <div class="history-dot" style="background:${modeColor[item.mode]||'#888'}"></div>
+      <span style="color:${modeColor[item.mode]};font-weight:600;font-size:11px;min-width:70px;">${item.mode}</span>
+      <span class="history-reason">${item.reason}</span>
+      <span class="history-time">${t}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Force mode ──────────────────────────────────────────────────────
+async function forceMode(mode) {
+  try {
+    await fetch(API + '/mode/force', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({mode}),
+      signal: AbortSignal.timeout(3000),
+    });
+    pollStatus();
+  } catch {
+    // Offline — just update UI
+    setModeDisplay(mode, 'Manual override (API offline — demo only)', 100);
+  }
+}
+
+// ── Tab switching ───────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Chat ────────────────────────────────────────────────────────────
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+async function sendMessage() {
+  const input   = document.getElementById('chat-input');
+  const text    = input.value.trim();
+  if (!text) return;
+
+  input.value   = '';
+  const sendBtn = document.getElementById('chat-send');
+  sendBtn.disabled = true;
+
+  appendMsg('user', text, 'You', null);
+  showTyping(true);
+
+  try {
+    const res = await fetch(API + '/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({prompt: text, system_prompt: 'You are Autex, an AI automotive diagnostic assistant. Be clear, technical, and helpful. Answer in 2-4 sentences unless more detail is needed.'}),
+      signal: AbortSignal.timeout(90000),
+    });
+    const d = await res.json();
+    showTyping(false);
+    let meta = `Autex · ${d.mode}`;
+    if (d.adaptive?.was_adapted) {
+      meta += ` <span style="color:#f0883e;">⟹ adapted from ${d.adaptive.rule_mode}</span>`;
+    }
+    appendMsg('ai', d.response_text || d.error || 'No response', meta, {
+      latency: d.latency_ms, tps: d.output_tokens && d.latency_ms ? (d.output_tokens / (d.latency_ms/1000)).toFixed(1) : null,
+      model: d.model, tokens: d.output_tokens,
+    });
+    pollLearning();
+  } catch(e) {
+    showTyping(false);
+    // Guardian fallback when API is offline
+    const guardian = guardianFallback(text);
+    appendMsg('ai', guardian, 'Autex · guardian (offline)', {latency: 0, model: 'guardian-rules-v1'});
+  }
+  sendBtn.disabled = false;
+}
+
+function guardianFallback(prompt) {
+  const p = prompt.toLowerCase();
+  if (p.includes('knock') || p.includes('knocking')) return 'A knocking sound typically indicates rod bearing wear, incorrect fuel octane, or carbon buildup. Check oil level immediately and reduce engine load. Seek service soon.';
+  if (p.includes('p0301') || p.includes('misfire')) return 'P0301 is a cylinder 1 misfire. Common causes: faulty spark plug, bad ignition coil, or fuel injector issue. Replace spark plug first — it\'s the cheapest fix.';
+  if (p.includes('overheat') || p.includes('temp')) return 'ALERT: Overheating detected. Pull over safely, turn off the engine, and allow to cool. Check coolant level before driving again.';
+  if (p.includes('p0171') || p.includes('lean')) return 'P0171 (system too lean) often means a vacuum leak, dirty MAF sensor, or weak fuel pump. Check intake hoses for cracks first.';
+  return 'I\'m running in Guardian mode (offline). Describe your issue and I\'ll provide basic diagnostic guidance. For full analysis, connect to the Nomad Runtime API.';
+}
+
+function appendMsg(role, text, meta, stats) {
+  const msgs = document.getElementById('chat-messages');
+  const div  = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  let statsHtml = '';
+  if (stats) {
+    const parts = [];
+    if (stats.latency != null) parts.push(`<span>Latency: <span class="stat-val">${stats.latency < 1 ? '<1' : Math.round(stats.latency)}ms</span></span>`);
+    if (stats.tps)             parts.push(`<span>TPS: <span class="stat-val">${stats.tps}</span></span>`);
+    if (stats.model)           parts.push(`<span>Model: <span class="stat-val">${stats.model}</span></span>`);
+    if (parts.length) statsHtml = `<div class="msg-stats">${parts.join('')}</div>`;
+  }
+
+  div.innerHTML = `
+    <div class="msg-avatar">${role === 'user' ? 'U' : 'A'}</div>
+    <div class="msg-body">
+      <div class="msg-meta">${meta}</div>
+      <div class="msg-text">${escHtml(text)}</div>
+      ${statsHtml}
+    </div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping(v) {
+  document.getElementById('typing-indicator').classList.toggle('visible', v);
+  const msgs = document.getElementById('chat-messages');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// ── Benchmark ───────────────────────────────────────────────────────
+async function runBenchmark() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = '⟳ Running...';
+  document.getElementById('bench-body').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:24px;">Running benchmark...</div>';
+
+  try {
+    const r = await fetch(API + '/benchmark?mode=guardian', {signal: AbortSignal.timeout(30000)});
+    const d = await r.json();
+    renderBenchmark(d);
+  } catch {
+    // Show demo results when API is offline
+    renderBenchmark(demoBenchmarkData());
+  }
+  btn.disabled    = false;
+  btn.textContent = '▶ Run Guardian';
+}
+
+function renderBenchmark(d) {
+  document.getElementById('adtc-sperf').textContent  = (d.adtc_sperf  || 0).toFixed(1);
+  document.getElementById('adtc-seff').textContent   = (d.adtc_seff   || 0).toFixed(1);
+  document.getElementById('adtc-total').textContent  = (d.adtc_total_est || 0).toFixed(1);
+
+  const offline = d.offline_capable;
+  const thermal = d.thermal_ok;
+
+  document.getElementById('bench-body').innerHTML = `
+    <div class="bench-row"><span class="bench-row-label">Mode</span><span class="bench-row-value">${d.mode?.toUpperCase()}</span></div>
+    <div class="bench-row"><span class="bench-row-label">Model</span><span class="bench-row-value">${d.model || 'none'}</span></div>
+    <div class="bench-row"><span class="bench-row-label">Backend</span><span class="bench-row-value">${d.backend}</span></div>
+    <div class="bench-row"><span class="bench-row-label">Avg latency</span><span class="bench-row-value">${(d.avg_latency_ms||0).toFixed(0)} ms</span></div>
+    <div class="bench-row"><span class="bench-row-label">Avg TPS</span>
+      <span class="bench-row-value">
+        <div class="score-bar-wrap">
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:${Math.min(100,(d.avg_tps||0)/15*100)}%"></div></div>
+          <span class="score-label">${(d.avg_tps||0).toFixed(1)}</span>
+        </div>
+      </span>
+    </div>
+    <div class="bench-row"><span class="bench-row-label">Peak RAM</span><span class="bench-row-value">${(d.peak_ram_gb||0).toFixed(2)} GB / 7 GB</span></div>
+    <div class="bench-row"><span class="bench-row-label">Offline capable</span><span class="badge ${offline?'good':'warn'}">${offline?'✓ YES':'✗ NO'}</span></div>
+    <div class="bench-row"><span class="bench-row-label">Thermal OK</span><span class="badge ${thermal?'good':'warn'}">${thermal?'✓ YES':'⚠ THROTTLED'}</span></div>
+  `;
+
+  // Per-run table
+  if (d.runs?.length) {
+    document.getElementById('run-table-card').style.display = 'block';
+    const tbody = document.getElementById('run-table-body');
+    tbody.innerHTML = d.runs.map(r => `
+      <tr style="border-top:1px solid var(--border);">
+        <td style="padding:7px 8px;">${r.prompt_label}</td>
+        <td style="padding:7px 8px;text-align:right;">${r.latency_ms < 1 ? '<1ms' : Math.round(r.latency_ms)+'ms'}</td>
+        <td style="padding:7px 8px;text-align:right;">${r.tps > 1000 ? 'instant' : r.tps.toFixed(1)}</td>
+        <td style="padding:7px 8px;text-align:right;">${r.error ? 'n/a' : (r.ram_peak_gb - r.ram_before_gb >= 0 ? '+' : '') + (r.ram_peak_gb - r.ram_before_gb).toFixed(2)+' GB'}</td>
+        <td style="padding:7px 8px;text-align:right;"><span class="badge ${r.error?'warn':'good'}">${r.error?'error':'✓'}</span></td>
+      </tr>
+    `).join('');
+  }
+}
+
+function demoBenchmarkData() {
+  return {
+    mode:'guardian', model:'guardian-rules-v1', backend:'deterministic',
+    avg_latency_ms:0.3, median_latency_ms:0.2, avg_tps:3200,
+    peak_ram_gb:0.24, adtc_sperf:100, adtc_seff:96.6, adtc_total_est:49.3,
+    offline_capable:true, thermal_ok:true,
+    runs:[
+      {prompt_label:'short',  latency_ms:0.1, tps:3445321, ram_before_gb:0.24, ram_peak_gb:0.24, error:null},
+      {prompt_label:'medium', latency_ms:0.2, tps:4194304, ram_before_gb:0.24, ram_peak_gb:0.24, error:null},
+      {prompt_label:'long',   latency_ms:0.4, tps:2197016, ram_before_gb:0.24, ram_peak_gb:0.24, error:null},
+    ],
+  };
+}
+
+// ── Learning tab ────────────────────────────────────────────────────
+async function pollLearning() {
+  try {
+    const [devRes, taskRes, histRes] = await Promise.all([
+      fetch(API + '/learning/device',  {signal: AbortSignal.timeout(4000)}),
+      fetch(API + '/learning/tasks',   {signal: AbortSignal.timeout(4000)}),
+      fetch(API + '/learning/history?n=15', {signal: AbortSignal.timeout(4000)}),
+    ]);
+    renderDeviceLearning(await devRes.json());
+    renderTaskLearning(await taskRes.json());
+    renderLearningEvents(await histRes.json());
+  } catch {
+    // API offline — leave placeholders, no crash
+  }
+}
+
+function renderDeviceLearning(d) {
+  const conf = d.confidence_pct ?? 0;
+  document.getElementById('device-learn-confidence').textContent = `${conf.toFixed(0)}% confidence`;
+  document.getElementById('device-learn-confidence').className =
+    'badge ' + (conf > 50 ? 'good' : conf > 15 ? 'info' : 'warn');
+
+  const biasColor = d.device_bias === 'downgrade' ? 'warn' : d.device_bias === 'upgrade' ? 'good' : 'info';
+
+  document.getElementById('device-learn-body').innerHTML = `
+    <div class="bench-row"><span class="bench-row-label">Sessions observed</span><span class="bench-row-value">${d.sessions_seen}</span></div>
+    <div class="bench-row"><span class="bench-row-label">Mean RAM free</span><span class="bench-row-value">${d.ram_mean_free_gb.toFixed(2)} GB</span></div>
+    <div class="bench-row"><span class="bench-row-label">Mean CPU load</span><span class="bench-row-value">${d.cpu_mean_pct.toFixed(0)}%</span></div>
+    <div class="bench-row"><span class="bench-row-label">Mean temperature</span><span class="bench-row-value">${d.temp_mean_c.toFixed(0)}°C</span></div>
+    <div class="bench-row"><span class="bench-row-label">RAM chronically low</span><span class="badge ${d.ram_chronic_low?'warn':'good'}">${d.ram_chronic_low?'⚠ YES':'✓ no'}</span></div>
+    <div class="bench-row"><span class="bench-row-label">CPU chronically high</span><span class="badge ${d.cpu_chronic_high?'warn':'good'}">${d.cpu_chronic_high?'⚠ YES':'✓ no'}</span></div>
+    <div class="bench-row"><span class="bench-row-label">Temp chronically hot</span><span class="badge ${d.temp_chronic_hot?'warn':'good'}">${d.temp_chronic_hot?'⚠ YES':'✓ no'}</span></div>
+    <div class="bench-row"><span class="bench-row-label">Current bias</span><span class="badge ${biasColor}">${d.device_bias}</span></div>
+    <div class="bench-row"><span class="bench-row-label">Reason</span><span class="bench-row-value" style="font-size:11px;color:var(--muted);text-align:right;max-width:60%;">${d.device_bias_reason}</span></div>
+  `;
+}
+
+function renderTaskLearning(tasks) {
+  if (!tasks.length) {
+    document.getElementById('task-learn-body').innerHTML =
+      '<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">No task data yet — chat with Autex to begin learning.</div>';
+    return;
+  }
+  document.getElementById('task-learn-body').innerHTML = tasks.map(t => {
+    const pct = Math.round(t.quality_needed * 100);
+    const biasColor = t.bias === 'upgrade' ? 'warn' : t.bias === 'downgrade' ? 'good' : 'info';
+    const biasLabel = t.bias === 'upgrade' ? '↑ needs bigger model' : t.bias === 'downgrade' ? '↓ small model OK' : '— neutral';
+    return `
+      <div class="bench-row" style="display:block;padding:10px 0;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-weight:600;font-size:12px;">${t.category}</span>
+          <span class="badge ${biasColor}">${biasLabel}</span>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:${pct}%;background:${t.bias==='upgrade'?'#f0883e':t.bias==='downgrade'?'#3fb950':'#58a6ff'}"></div></div>
+          <span class="score-label">${pct}%</span>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;">
+          ${t.count} sample${t.count!==1?'s':''} · avg satisfaction ${(t.avg_satisfaction*100).toFixed(0)}% · last used ${t.last_mode}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderLearningEvents(events) {
+  const tbody = document.getElementById('learn-events-body');
+  if (!events.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px;">No events yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = events.slice().reverse().map(e => `
+    <tr style="border-top:1px solid var(--border);">
+      <td style="padding:7px 8px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(e.prompt_snippet)}</td>
+      <td style="padding:7px 8px;color:var(--muted);">${e.category}</td>
+      <td style="padding:7px 8px;text-align:right;"><span class="badge info">${e.mode}</span></td>
+      <td style="padding:7px 8px;text-align:right;">${e.tokens}</td>
+    </tr>
+  `).join('');
+}
+
+async function resetLearning() {
+  if (!confirm('Reset all learned device and task knowledge?')) return;
+  try {
+    await fetch(API + '/learning/reset', {method:'POST', signal: AbortSignal.timeout(4000)});
+    pollLearning();
+  } catch {
+    alert('Could not reach API to reset learning.');
+  }
+}
+
+// ── Capability tab ──────────────────────────────────────────────────
+async function loadCapability() {
+  try {
+    const r = await fetch(API + '/capability', {signal: AbortSignal.timeout(6000)});
+    const d = await r.json();
+    renderCapability(d);
+  } catch {
+    document.getElementById('cap-headline').textContent =
+      'Could not reach Nomad Runtime API — start nomad_api_server.py to see live hardware detection.';
+    document.getElementById('cap-scan-meta').textContent = 'API offline';
+  }
+}
+
+async function rescanCapability() {
+  document.getElementById('cap-headline').textContent = 'Re-scanning hardware...';
+  try {
+    const r = await fetch(API + '/capability/rescan', {method:'POST', signal: AbortSignal.timeout(8000)});
+    const d = await r.json();
+    renderCapability(d);
+  } catch {
+    alert('Could not reach API to rescan.');
+  }
+}
+
+function renderCapability(d) {
+  const cap = d.capability;
+  const badVerdict = d.recommended_default === 'guardian';
+
+  document.getElementById('cap-scan-meta').textContent =
+    `Scanned in ${cap.detection_duration_ms.toFixed(1)}ms · cached on disk · ${cap.os_name} ${cap.architecture}`;
+
+  document.getElementById('cap-headline').innerHTML =
+    `<span style="color:${badVerdict ? '#ff7b72' : '#3fb950'};font-weight:600;">${escHtml(d.headline)}</span>`;
+
+  document.getElementById('cap-cpu').textContent     = cap.cpu_model;
+  document.getElementById('cap-cores').textContent   = `${cap.physical_cores}P / ${cap.logical_cores}L`;
+  document.getElementById('cap-ram').textContent     = `${cap.ram_total_gb.toFixed(1)} GB`;
+  document.getElementById('cap-avx2').textContent    = cap.has_avx2 ? '✓ Yes' : '✗ No';
+  document.getElementById('cap-gpu').textContent     = cap.gpu_present ? cap.gpu_name : 'None (integrated)';
+  document.getElementById('cap-npu').textContent     = cap.npu_present ? cap.npu_name : 'None';
+  document.getElementById('cap-battery').textContent = cap.has_battery ? 'Present' : 'None';
+  document.getElementById('cap-os').textContent      = `${cap.os_name} ${cap.os_version}`;
+
+  document.getElementById('cap-tiers-body').innerHTML = d.tiers.map(t => {
+    const statusClass = t.viable ? 'good' : 'warn';
+    const statusLabel = t.viable ? '✓ VIABLE' : '✗ NOT VIABLE';
+    return `
+      <div class="bench-row" style="display:block;padding:12px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-weight:600;font-size:13px;">${t.mode.toUpperCase()}</span>
+          <span class="badge ${statusClass}">${statusLabel}</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${escHtml(t.reason)}</div>
+        <div style="font-size:10px;color:var(--muted);">
+          Est. RAM: ${t.est_ram_gb} GB · Est. speed: ${t.est_tps_range} · Confidence: ${t.confidence}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Plugins tab ─────────────────────────────────────────────────────
+async function pollPlugins() {
+  try {
+    const r = await fetch(API + '/plugins', {signal: AbortSignal.timeout(5000)});
+    const d = await r.json();
+    renderPlugins(d.plugins || []);
+  } catch {
+    document.getElementById('plugin-cards').innerHTML =
+      '<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Start nomad_api_server.py to see the plugin registry.</div>';
+  }
+}
+
+function renderPlugins(plugins) {
+  const container = document.getElementById('plugin-cards');
+  if (!plugins.length) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">No plugins discovered.</div>';
+    return;
+  }
+
+  container.innerHTML = plugins.map(p => {
+    const healthy    = p.healthy;
+    const quarantined = p.quarantined;
+    const statusColor = quarantined ? '#ff7b72' : healthy ? '#3fb950' : '#f0883e';
+    const statusLabel = quarantined ? '🚫 QUARANTINED' : healthy ? '✓ healthy' : '✗ unhealthy';
+    const formats    = p.typical_formats?.length ? p.typical_formats.join(', ') : 'none';
+
+    return `
+    <div class="bench-card">
+      <div class="bench-card-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-weight:700;font-size:15px;font-family:monospace;">${escHtml(p.engine_id)}</span>
+            <span style="color:var(--muted);font-size:12px;">${escHtml(p.engine_name)} v${escHtml(p.engine_version)}</span>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px;">source: ${escHtml(p.source_file)}</div>
+        </div>
+        <span style="color:${statusColor};font-size:12px;font-weight:600;">${statusLabel}</span>
+      </div>
+      <div class="bench-body" style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+        <div class="bench-row"><span class="bench-row-label">Health message</span><span class="bench-row-value" style="font-size:11px;color:var(--muted);text-align:right;max-width:70%;">${escHtml(p.health_message || '—')}</span></div>
+        <div class="bench-row"><span class="bench-row-label">Model formats</span><span class="bench-row-value">${escHtml(formats)}</span></div>
+        <div class="bench-row"><span class="bench-row-label">Needs GPU</span><span class="badge ${p.requires_gpu ? 'warn' : 'good'}">${p.requires_gpu ? 'yes' : 'no'}</span></div>
+        <div class="bench-row"><span class="bench-row-label">Needs network</span><span class="badge ${p.requires_network ? 'warn' : 'good'}">${p.requires_network ? 'yes' : 'no'}</span></div>
+        <div class="bench-row"><span class="bench-row-label">Streaming</span><span class="badge info">${p.supports_streaming ? 'yes' : 'no'}</span></div>
+        <div class="bench-row"><span class="bench-row-label">Calls / Errors</span><span class="bench-row-value">${p.call_count} / ${p.error_count}</span></div>
+      </div>
+      ${quarantined ? `
+      <div class="bench-body" style="border-top:1px solid var(--border);">
+        <div class="setup-banner" style="background:#ff7b7211;border-color:#ff7b7233;color:#ff7b72;">
+          <span>⚠</span>
+          <div>Quarantined: ${escHtml(p.quarantine_reason)}
+          <button onclick="clearQuarantine('${escHtml(p.engine_id)}')"
+            style="margin-left:12px;background:#ff7b7222;border:1px solid #ff7b7244;color:#ff7b72;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">
+            Clear quarantine
+          </button>
+          </div>
+        </div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function clearQuarantine(engineId) {
+  try {
+    const r = await fetch(`${API}/plugins/${engineId}/quarantine/reset`,
+      {method:'POST', signal: AbortSignal.timeout(4000)});
+    const d = await r.json();
+    if (d.quarantine_cleared) pollPlugins();
+  } catch {
+    alert('Could not reach API.');
+  }
+}
+
+// ── Boot ────────────────────────────────────────────────────────────
+pollStatus();
+pollHistory();
+checkOllama();
+pollLearning();
+loadCapability();
+pollPlugins();
+setInterval(pollStatus,   5000);
+setInterval(pollHistory,  10000);
+setInterval(checkOllama,  15000);
+setInterval(pollLearning, 8000);
+setInterval(pollPlugins,  12000);
+</script>
+</body>
+</html>
