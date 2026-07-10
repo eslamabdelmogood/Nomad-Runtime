@@ -40,7 +40,7 @@ from typing import Optional
 from plugin_base import InferencePlugin, PluginHealthStatus, PluginFault
 
 
-PLUGINS_DIR = Path(__file__).parent / "plugins"
+PLUGINS_DIR = Path(__file__).parent.parent / "plugins"
 
 
 @dataclass
