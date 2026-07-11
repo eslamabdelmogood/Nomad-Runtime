@@ -22,7 +22,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(__file__) + "/../core")
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from device_monitor import DeviceMonitor
@@ -340,6 +340,15 @@ def learning_reset():
         learner._db.unlink()
     learner = AdaptiveLearner(db_path=learner._db)
     return jsonify({"status": "reset"})
+
+@app.route("/")
+def home():
+    return send_from_directory(os.path.dirname(__file__), "dashboard.html")
+
+
+@app.route("/dashboard")
+def  dashboard_page():
+    return send_from_directory(os.path.dirname(__file__), "dashboard.html")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────
